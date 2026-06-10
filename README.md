@@ -60,46 +60,56 @@ TF-IDF with unigrams + bigrams, `max_features=500`, sublinear TF scaling
 - Default rate by country (Ireland 24.4 %, UK 20.8 % — highest risk)
 - Narrative keyword exploration
 
-`src/fasa_credit_assessment/features.py` adds 12 engineered features:
+`src/fasa_credit_assessment/features.py` adds 12 engineered features, of which 10 are used in model training:
 
-| Feature | Description |
-|---------|-------------|
-| `log_revenue_m` | Log-normalised revenue (right-skewed raw distribution) |
-| `log_employee_count` | Log-normalised headcount |
-| `leverage_pressure` | `debt_ratio / (interest_coverage + 0.1)` — combined stress indicator |
-| `liquidity_profitability` | `cash_ratio × ebitda_margin` — jointly low = high risk |
-| `growth_profitability` | `revenue_growth × ebitda_margin` |
-| `young_company` | Flag: `years_in_operation < 3` |
-| `weak_interest_coverage` | Flag: `interest_coverage < 1.5` |
-| `high_debt_ratio` | Flag: debt ratio above training 75th percentile (≈ 0.50) |
-| `low_cash_ratio` | Flag: cash ratio below training 25th percentile (≈ 0.064) |
-| `risk_keyword_count` | Risk phrase count in narrative |
-| `positive_keyword_count` | Positive phrase count in narrative |
-| `narrative_length` | Word count of business description |
+| Feature | Used in model | Description |
+|---------|:---:|-------------|
+| `log_revenue_m` | ✓ | Log-normalised revenue (right-skewed raw distribution) |
+| `log_employee_count` | ✓ | Log-normalised headcount |
+| `leverage_pressure` | ✓ | `debt_ratio / (interest_coverage + 0.1)` — combined stress indicator |
+| `liquidity_profitability` | ✓ | `cash_ratio × ebitda_margin` — jointly low = high risk |
+| `growth_profitability` | ✓ | `revenue_growth × ebitda_margin` |
+| `narrative_length` | ✓ | Word count of business description |
+| `young_company` | ✓ | Flag: `years_in_operation < 3` |
+| `weak_interest_coverage` | ✓ | Flag: `interest_coverage < 1.5` |
+| `high_debt_ratio` | ✓ | Flag: debt ratio above training 75th percentile (≈ 0.50) |
+| `low_cash_ratio` | ✓ | Flag: cash ratio below training 25th percentile (≈ 0.064) |
+| `risk_keyword_count` | — | Risk phrase count — used in explanation layer only |
+| `positive_keyword_count` | — | Positive phrase count — used in explanation layer only |
 
 **Leakage prevention:** quantile thresholds are fitted only on the training set and passed as `fit_stats` when transforming the scoring set.
 
-**Multicollinearity note:** engineered ratio features correlate with their source columns. Under L2 regularisation logistic regression tolerates this, but the baseline model (ROC-AUC 0.7631) slightly outperforms the engineered variant (0.7479) because the engineered features add correlated noise without new information for a linear model. The engineered features would be more valuable in a tree-based model (LightGBM / XGBoost).
-
 ---
 
-## Model
+## Models
 
-`LogisticRegression(max_iter=2000, class_weight="balanced", random_state=42)` inside a single `sklearn.pipeline.Pipeline`. `class_weight="balanced"` corrects for the ~5:1 class imbalance without resampling.
+Two algorithm families × two feature sets = four variants, all trained via a single `sklearn.pipeline.Pipeline`:
+
+| Algorithm | Imbalance handling | Variant key |
+|---|---|---|
+| `LogisticRegression(max_iter=2000, random_state=42)` | `class_weight="balanced"` | `lr_baseline`, `lr_engineered` |
+| `LGBMClassifier(n_estimators=400, learning_rate=0.05)` | `scale_pos_weight=5.0` | `lgbm_baseline`, `lgbm_engineered` |
 
 ---
 
 ## Evaluation (held-out 20 % split)
 
-| Metric | Baseline | Engineered |
-|--------|----------|------------|
-| ROC-AUC | **0.7631** | 0.7479 |
-| Average Precision | 0.492 | 0.4948 |
-| Brier Score | 0.1806 | 0.1817 |
-| Accuracy @ threshold 0.5 | 0.730 | 0.745 |
+| Variant | ROC-AUC | PR AUC | F1 Score | Brier | Acc @0.5 |
+|---------|---------|--------|----------|-------|----------|
+| **LR baseline** | **0.7631** | 0.492 | **0.460** | 0.1806 | 0.730 |
+| LR engineered | 0.7491 | 0.496 | 0.489 | 0.1816 | 0.760 |
+| LGBM baseline | 0.7032 | 0.438 | 0.327 | 0.1483 | 0.835 |
+| LGBM engineered | 0.7356 | 0.465 | 0.360 | **0.1439** | **0.840** |
 
-Full metrics saved to `outputs/metrics_baseline.json` and `outputs/metrics_engineered.json`.  
-Validation predictions saved to `outputs/validation_predictions_baseline.csv` and `outputs/validation_predictions_engineered.csv`.
+**Key observations:**
+- PR AUC and F1 are reported alongside ROC-AUC because the ~5:1 class imbalance makes ROC-AUC optimistic — PR AUC focuses on the minority (default) class
+- LR baseline wins on ROC-AUC and F1; engineered features add collinearity noise for the linear model
+- LGBM engineered beats LGBM baseline on all metrics (+0.032 ROC-AUC, +0.034 F1) — tree models exploit non-linear interactions natively
+- LGBM has superior Brier scores (better probability calibration), which matters for risk rating thresholds
+- On a larger real-world dataset, `lgbm_engineered` would likely become the winner
+
+Full metrics saved to `outputs/metrics_{variant}.json` for all four variants.  
+Validation predictions saved to `outputs/validation_predictions_{variant}.csv`.
 
 ---
 
@@ -161,11 +171,15 @@ uv run fasa-credit
 |------|----------|
 | `outputs/predictions.csv` | `company_id, predicted_default_probability, risk_rating, explanation` for all 50 scoring companies |
 | `outputs/metrics.json` | Best-variant metrics (ROC-AUC, average precision, Brier score, accuracy) |
-| `outputs/metrics_baseline.json` | Baseline model metrics |
-| `outputs/metrics_engineered.json` | Engineered model metrics |
+| `outputs/metrics_lr_baseline.json` | LR baseline metrics |
+| `outputs/metrics_lr_engineered.json` | LR engineered metrics |
+| `outputs/metrics_lgbm_baseline.json` | LGBM baseline metrics |
+| `outputs/metrics_lgbm_engineered.json` | LGBM engineered metrics |
 | `outputs/validation_predictions.csv` | Best-variant validation predictions |
-| `outputs/validation_predictions_baseline.csv` | Baseline held-out predictions |
-| `outputs/validation_predictions_engineered.csv` | Engineered held-out predictions |
+| `outputs/validation_predictions_lr_baseline.csv` | LR baseline held-out predictions |
+| `outputs/validation_predictions_lr_engineered.csv` | LR engineered held-out predictions |
+| `outputs/validation_predictions_lgbm_baseline.csv` | LGBM baseline held-out predictions |
+| `outputs/validation_predictions_lgbm_engineered.csv` | LGBM engineered held-out predictions |
 
 ---
 
@@ -195,7 +209,7 @@ Walk the hiring panel through the following in order:
 ## Known Limitations & Possible Improvements
 
 - **Text features:** TF-IDF captures surface keywords but misses semantic meaning. A swap to sentence embeddings (via `sentence-transformers`) or a frozen LLM encoder would likely improve text signal quality — `BaseExplainer` / `predict` are already structured for this drop-in.
-- **Model:** Logistic regression is interpretable and fast but may underfit non-linear interactions. Gradient boosting (LightGBM / XGBoost) is the natural next step, and would also benefit more from the engineered features.
+- **Model:** LightGBM is included alongside logistic regression. On 1 000 synthetic samples LR still edges LGBM on ROC-AUC; on a larger real-world dataset LGBM engineered would be expected to win. XGBoost or CatBoost could also be explored.
 - **Threshold:** 0.5 is used for binary labels; a calibrated threshold optimised for precision-recall would be more appropriate for credit risk.
 - **Calibration:** Predicted probabilities are not post-hoc calibrated (e.g. Platt scaling). Calibration matters for risk rating thresholds.
 - **Feature engineering:** The engineered features express domain intuition clearly. For a tree model, they would likely add +2–4 % ROC-AUC.

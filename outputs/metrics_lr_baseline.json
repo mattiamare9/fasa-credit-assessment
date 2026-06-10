@@ -1,7 +1,10 @@
 {
-  "variant": "baseline",
+  "variant": "lr_baseline",
+  "algorithm": "lr",
+  "features": "baseline",
   "roc_auc": 0.7631,
-  "average_precision": 0.492,
+  "pr_auc": 0.492,
+  "f1_score": 0.46,
   "brier_score": 0.1806,
   "accuracy_at_0_5": 0.73,
   "val_size": 200,

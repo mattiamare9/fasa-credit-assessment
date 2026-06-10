@@ -1,9 +1,12 @@
 {
-  "variant": "engineered",
-  "roc_auc": 0.7491,
-  "average_precision": 0.496,
-  "brier_score": 0.1816,
-  "accuracy_at_0_5": 0.76,
+  "variant": "lr_baseline",
+  "algorithm": "lr",
+  "features": "baseline",
+  "roc_auc": 0.7631,
+  "pr_auc": 0.492,
+  "f1_score": 0.46,
+  "brier_score": 0.1806,
+  "accuracy_at_0_5": 0.73,
   "val_size": 200,
   "val_positive_rate": 0.175
 }

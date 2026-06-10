@@ -1,0 +1,12 @@
+{
+  "variant": "lgbm_baseline",
+  "algorithm": "lgbm",
+  "features": "baseline",
+  "roc_auc": 0.7032,
+  "pr_auc": 0.4378,
+  "f1_score": 0.3265,
+  "brier_score": 0.1483,
+  "accuracy_at_0_5": 0.835,
+  "val_size": 200,
+  "val_positive_rate": 0.175
+}

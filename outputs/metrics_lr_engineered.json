@@ -1,7 +1,10 @@
 {
-  "variant": "engineered",
+  "variant": "lr_engineered",
+  "algorithm": "lr",
+  "features": "engineered",
   "roc_auc": 0.7491,
-  "average_precision": 0.496,
+  "pr_auc": 0.496,
+  "f1_score": 0.4894,
   "brier_score": 0.1816,
   "accuracy_at_0_5": 0.76,
   "val_size": 200,

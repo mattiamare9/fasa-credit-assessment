@@ -1,0 +1,12 @@
+{
+  "variant": "lgbm_engineered",
+  "algorithm": "lgbm",
+  "features": "engineered",
+  "roc_auc": 0.7356,
+  "pr_auc": 0.465,
+  "f1_score": 0.36,
+  "brier_score": 0.1439,
+  "accuracy_at_0_5": 0.84,
+  "val_size": 200,
+  "val_positive_rate": 0.175
+}
