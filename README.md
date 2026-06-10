@@ -169,13 +169,15 @@ uv run fasa-credit
 
 | File | Contents |
 |------|----------|
-| `outputs/predictions.csv` | `company_id, predicted_default_probability, risk_rating, explanation` for all 50 scoring companies |
-| `outputs/metrics.json` | Best-variant metrics (ROC-AUC, average precision, Brier score, accuracy) |
+| `outputs/predictions_lr_baseline.csv` | `company_id, predicted_default_probability, risk_rating, explanation` — LR baseline |
+| `outputs/predictions_lr_engineered.csv` | Same schema — LR engineered |
+| `outputs/predictions_lgbm_baseline.csv` | Same schema — LGBM baseline |
+| `outputs/predictions_lgbm_engineered.csv` | Same schema — LGBM engineered |
+| `outputs/metrics.json` | Best-variant metrics (ROC-AUC, PR AUC, F1, Brier, accuracy) |
 | `outputs/metrics_lr_baseline.json` | LR baseline metrics |
 | `outputs/metrics_lr_engineered.json` | LR engineered metrics |
 | `outputs/metrics_lgbm_baseline.json` | LGBM baseline metrics |
 | `outputs/metrics_lgbm_engineered.json` | LGBM engineered metrics |
-| `outputs/validation_predictions.csv` | Best-variant validation predictions |
 | `outputs/validation_predictions_lr_baseline.csv` | LR baseline held-out predictions |
 | `outputs/validation_predictions_lr_engineered.csv` | LR engineered held-out predictions |
 | `outputs/validation_predictions_lgbm_baseline.csv` | LGBM baseline held-out predictions |

@@ -101,43 +101,34 @@ def main() -> None:
         json.dump(best_metrics, f, indent=2)
 
     # ------------------------------------------------------------------ #
-    # Final model — fit on full training set, score unseen companies       #
+    # Final models — fit each variant on full training set, score all 50  #
     # ------------------------------------------------------------------ #
-    algo, features = best_variant.split("_", 1)
-    df_train_best = df_train_eng if features == "engineered" else df_train_raw
-    df_scoring_best = df_scoring_eng if features == "engineered" else df_scoring_raw
+    variant_dfs = {
+        "lr_baseline":      (df_train_raw, df_scoring_raw),
+        "lr_engineered":    (df_train_eng, df_scoring_eng),
+        "lgbm_baseline":    (df_train_raw, df_scoring_raw),
+        "lgbm_engineered":  (df_train_eng, df_scoring_eng),
+    }
 
-    print("\nTraining final model on full training set...")
-    pipeline = train_final(df_train_best, variant=best_variant)
-
-    print("Predicting scoring companies...")
-    probs = predict(pipeline, df_scoring_best, variant=best_variant)
-    probs_rounded = np.round(probs, 4)
-
-    # ------------------------------------------------------------------ #
-    # Explanations (use engineered df for richer signals)                  #
-    # ------------------------------------------------------------------ #
     explainer = RuleBasedExplainer()
-    explanations = explainer.explain_batch(df_scoring_eng, probs_rounded)
+    saved_prediction_files = []
 
-    # ------------------------------------------------------------------ #
-    # Save predictions                                                     #
-    # ------------------------------------------------------------------ #
-    predictions = pd.DataFrame({
-        "company_id": df_scoring_raw["company_id"],
-        "predicted_default_probability": probs_rounded,
-        "risk_rating": [get_risk_rating(p) for p in probs_rounded],
-        "explanation": explanations,
-    })
+    print("\nTraining final models and scoring companies...")
+    for variant, (df_train_v, df_scoring_v) in variant_dfs.items():
+        pipeline = train_final(df_train_v, variant=variant)
+        probs = predict(pipeline, df_scoring_v, variant=variant)
+        probs_rounded = np.round(probs, 4)
+        explanations = explainer.explain_batch(df_scoring_eng, probs_rounded)
 
-    out_path = OUTPUTS_DIR / "predictions.csv"
-    predictions.to_csv(out_path, index=False)
-
-    # backward-compat validation_predictions.csv → best variant's file
-    import shutil
-    best_val = OUTPUTS_DIR / f"validation_predictions_{best_variant}.csv"
-    if best_val.exists():
-        shutil.copy(best_val, OUTPUTS_DIR / "validation_predictions.csv")
+        out_path = OUTPUTS_DIR / f"predictions_{variant}.csv"
+        pd.DataFrame({
+            "company_id": df_scoring_raw["company_id"],
+            "predicted_default_probability": probs_rounded,
+            "risk_rating": [get_risk_rating(p) for p in probs_rounded],
+            "explanation": explanations,
+        }).to_csv(out_path, index=False)
+        saved_prediction_files.append(out_path)
+        print(f"  Saved {out_path.name}")
 
     # ------------------------------------------------------------------ #
     # Summary                                                              #
@@ -147,11 +138,8 @@ def main() -> None:
         print(f"  {OUTPUTS_DIR / f'metrics_{v}.json'}")
         print(f"  {OUTPUTS_DIR / f'validation_predictions_{v}.csv'}")
     print(f"  {OUTPUTS_DIR / 'metrics.json'}  (best variant: {best_variant})")
-    print(f"  {OUTPUTS_DIR / 'validation_predictions.csv'}  (best variant)")
-    print(f"  {out_path}")
-
-    print(f"\n=== First 10 predictions ===")
-    print(predictions.head(10).to_string(index=False))
+    for p in saved_prediction_files:
+        print(f"  {p}")
 
 
 if __name__ == "__main__":
