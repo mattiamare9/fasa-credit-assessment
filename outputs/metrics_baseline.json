@@ -1,0 +1,9 @@
+{
+  "variant": "baseline",
+  "roc_auc": 0.7631,
+  "average_precision": 0.492,
+  "brier_score": 0.1806,
+  "accuracy_at_0_5": 0.73,
+  "val_size": 200,
+  "val_positive_rate": 0.175
+}
